@@ -192,15 +192,25 @@ class ExporterView(View):
      
     @admin_decorator
     def delete(self, request):
-        try:
-            exporter_id = request.GET['exporter_id']
-            exporter    = Exporter.objects.get(id=exporter_id)
-            release     = Release.objects.filter(exporter_id=exporter_id)
+        try:          
+            filter_categories = {
+                'category_id' : 'category__in',
+                'exporter_id' : 'id__in'
+            }
 
-            if release.exists():
-                release.delete()    
-
-            exporter.delete()
+            filter_set = {
+                filter_categories.get(key) : value 
+                for (key, value) in dict(request.GET).items() 
+                if filter_categories.get(key)
+            }
+            
+            exporters      = Exporter.objects.filter(**filter_set).distinct()
+            exporters_name = [exporter.name for exporter in exporters]
+            
+            dataframe = pd.read_csv('exporter_list.csv', sep=',')
+            dataframe = dataframe[~dataframe.project_name.isin(exporters_name)]
+            dataframe.to_csv('exporter_list.csv', index=False)
+            exporters.delete()
             
             return JsonResponse({'message':'SUCCESS'}, status=200)
         
